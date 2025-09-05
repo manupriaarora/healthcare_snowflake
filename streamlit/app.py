@@ -18,20 +18,32 @@ try:
     current_dir = os.path.dirname(os.path.abspath(__file__))
     secrets_path = os.path.join(current_dir, '.streamlit', 'secrets.toml')
     
-    # Load credentials from secrets.toml
-    secrets = toml.load(secrets_path)
-    snowflake_secrets = secrets.get('snowflake')
+    p_key = None
+    if 'snowflake' in st.secrets:
+        snowflake_secrets = st.secrets.snowflake
+        # Get the private key content and passphrase from the secrets
+        private_key_content = snowflake_secrets.get('private_key_content')
+        private_key_passphrase = snowflake_secrets.get('private_key_passphrase')
 
-    # Get the private key path and passphrase from the secrets
-    private_key_path = snowflake_secrets.get('private_key_path')
-    private_key_passphrase = snowflake_secrets.get('private_key_passphrase')
-
-    # Load the private key
-    with open(private_key_path, "rb") as key_file:
+        # Load the private key from the content
         p_key = serialization.load_pem_private_key(
-            key_file.read(),
+            private_key_content.encode('utf-8'),
             password=private_key_passphrase.encode() if private_key_passphrase else None
         )
+    else:
+        # Fallback for local testing, loading from a local secrets.toml file
+        secrets = toml.load('.streamlit/secrets.toml')
+        snowflake_secrets = secrets.get('snowflake')
+        # Get the private key path and passphrase from the secrets
+        private_key_path = snowflake_secrets.get('private_key_path')
+        private_key_passphrase = snowflake_secrets.get('private_key_passphrase')
+
+        # Load the private key
+        with open(private_key_path, "rb") as key_file:
+            p_key = serialization.load_pem_private_key(
+                key_file.read(),
+                password=private_key_passphrase.encode() if private_key_passphrase else None
+            )
 
     # Establish the connection directly using snowflake.connector
     conn = snowflake.connector.connect(
